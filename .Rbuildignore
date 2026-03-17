@@ -1,0 +1,4 @@
+^\.Rbuildignore$
+^cran-comments\.md$
+^README\.md$
+^\.git$
