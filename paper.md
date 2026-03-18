@@ -1,5 +1,5 @@
 ---
-title: 'R Packages for Advanced Panel Data Econometrics: Missing Data, Quantile Methods, Causality, and Estimation'
+title: 'R Packages for Advanced Panel Data Econometrics'
 tags:
   - R
   - econometrics
@@ -23,109 +23,99 @@ bibliography: paper.bib
 
 # Summary
 
-We present seven R packages for advanced panel data econometrics: `xtmispanel` for missing data diagnostics and imputation, `xtcsdq` for cross-sectional dependence testing in quantile regressions, `xtpcaus` for panel Granger causality with Fourier terms and quantile methods, `xtpcmg` for panel cointegrating polynomial regressions via FM-OLS, `xtrec` for recursively detrended panel unit root tests, `xtfifevd` for fixed effects estimation with time-invariant regressors, and `xtqsh` for quantile regression slope homogeneity testing. These packages address methodological gaps in the R ecosystem for panel data analysis, implementing recent advances that were previously available only in Stata, GAUSS, or MATLAB.
+Seven R packages address gaps in panel data econometrics: `xtmispanel` for missing data diagnostics and imputation, `xtcsdq` for cross-sectional dependence testing in quantile regressions [@Demetrescu2023], `xtpcaus` for panel Granger causality, `xtpcmg` for panel cointegrating polynomial regressions via FM-OLS, `xtrec` for recursively detrended panel unit root tests [@Westerlund2015], `xtfifevd` for fixed effects with time-invariant regressors, and `xtqsh` for quantile slope homogeneity testing [@Galvao2017]. All are open-source under GPL-3.
 
 # Statement of Need
 
-Panel data methods are central to modern empirical economics, political science, and sociology. While R provides foundational panel tools through `plm` [@Croissant2008] and `fixest` [@Berge2021], several important methodological advances lack R implementations:
-
-1. **Missing data in panels** requires specialized diagnostics beyond cross-sectional methods, including per-panel and per-period analysis, MCAR/MAR testing, and panel-aware imputation [@Little1988].
-2. **Cross-sectional dependence in quantile regressions** has only recently received formal testing procedures [@Demetrescu2023], with no existing software implementation.
-3. **Panel Fourier Granger causality** [@Yilanci2020panel] and **panel quantile causality** [@Wang2022] extend standard panel VAR methods but lack R packages.
-4. **Panel cointegrating polynomial regressions** with FM-OLS [@Wagner2023; @deJong2022] enable estimation of nonlinear long-run relationships (e.g., Environmental Kuznets Curves) but have no R implementation.
-5. **Recursively detrended panel unit root tests** [@Westerlund2015] offer improved power through novel detrending but are unavailable in R.
-6. **Fixed Effects Vector Decomposition** [@Plumper2007] and **Fixed Effects Filtered** [@PesaranZhou2016] methods address the long-standing problem of estimating time-invariant regressor effects in panel models.
-7. **Quantile slope homogeneity tests** [@Galvao2017] extend mean-based homogeneity tests to distributional analysis but have no R implementation.
+R provides foundational panel tools through `plm` [@Croissant2008] and `fixest` [@Berge2021], yet several recent methodological advances lack R implementations: specialized panel missing data diagnostics, cross-sectional dependence tests for quantile regressions, panel Fourier Granger causality, cointegrating polynomial regressions with FM-OLS, recursively detrended unit root tests, estimation of time-invariant regressor effects, and quantile slope homogeneity tests.
 
 # Packages
 
 ## xtmispanel
 
-Provides comprehensive tools for detecting, diagnosing, and imputing missing data in panel datasets. Includes per-variable, per-panel, and per-period summary tables, missing data pattern matrices, approximate @Little1988 MCAR test, logistic regression MAR test, and eleven imputation methods (mean, median, LOCF, NOCB, linear/spline interpolation, PMM, hot-deck, KNN, random forest, and EM).
+Detects, diagnoses, and imputes missing values in panel data. Provides per-variable, per-panel, and per-period summaries, approximate @Little1988 MCAR and MAR tests, and eleven imputation methods (mean, median, LOCF, NOCB, linear/spline interpolation, PMM, hot-deck, KNN, random forest, EM).
 
 ```r
 library(xtmispanel)
-diag <- xtmisdiag(data, id = "country", time = "year")
-summary(diag)
-imputed <- xtmisimpute(data, id = "country", time = "year",
-                       method = "pmm")
+result <- xtmispanel(data, index = c("country", "year"),
+                     detect = TRUE, test = TRUE,
+                     impute = "pmm", target = "gdp")
 ```
 
 ## xtcsdq
 
-Implements tests of no cross-sectional error dependence (CSD) in panel quantile regressions following @Demetrescu2023. Provides the T_τ statistic and its bias-corrected version, plus a portmanteau statistic M_K aggregating evidence across multiple quantile levels. Supports pooled fixed-effects QR, individual unit QR, and post-estimation modes.
+Tests for cross-sectional error dependence in panel quantile regressions following @Demetrescu2023. Provides T_τ and bias-corrected T̃_τ statistics, plus a portmanteau M_K statistic across quantiles.
 
 ```r
 library(xtcsdq)
 result <- xtcsdq(y ~ x1 + x2, data = panel_data,
-                 id = "country", time = "year",
-                 taus = c(0.25, 0.5, 0.75))
+                 index = c("country", "year"),
+                 quantiles = c(0.25, 0.5, 0.75))
 summary(result)
 ```
 
 ## xtpcaus
 
-Implements two panel Granger causality tests. The Panel Fourier Toda-Yamamoto (PFTY) test extends the @TodaYamamoto1995 framework with Fourier terms following @Yilanci2020panel and @Emirmahmutoglu2011. The Panel Quantile Causality (PQC) test examines causality across the conditional distribution following @Wang2022 and @Chuang2009. Bootstrap p-values account for cross-sectional dependence.
+Panel Fourier Toda–Yamamoto (PFTY) and Panel Quantile Causality (PQC) tests with bootstrap p-values.
 
 ```r
 library(xtpcaus)
-# Panel Fourier Toda-Yamamoto
-result <- pfty(y, x, data = panel_data, id = "country",
-               time = "year", max_freq = 3, nboot = 1000)
+result <- xtpcaus(data = panel_data, y = "gdp", x = "investment",
+                  panel_id = "country", time_id = "year",
+                  test = "pfty", kmax = 3, nboot = 499)
 summary(result)
 ```
 
 ## xtpcmg
 
-Implements Group-Mean and Pooled Fully Modified OLS (FM-OLS) estimators for panel cointegrating polynomial regressions. The Group-Mean FM-OLS follows @Wagner2023, and the Pooled FM-OLS follows @deJong2022. Supports quadratic and cubic polynomial regressors with HAC long-run variance estimation, turning point analysis with delta-method confidence intervals, and @Swamy1970 slope homogeneity test.
+Group-Mean and Pooled FM-OLS for panel cointegrating polynomial regressions. Group-Mean follows @Wagner2023; Pooled follows @deJong2022. Supports quadratic and cubic polynomials with HAC long-run variance, turning point analysis, and @Swamy1970 slope homogeneity test.
 
 ```r
 library(xtpcmg)
-result <- xtpcmg(y ~ x + I(x^2), data = panel_data,
-                 id = "country", time = "year",
-                 estimator = "group_mean", degree = 2)
+result <- xtpcmg(data = panel_data, y = "emissions",
+                 x = "gdp", panel_id = "country",
+                 time_id = "year", model = "mg", q = 2)
 summary(result)
-# Turning point analysis
-tp <- turning_point(result)
 ```
 
 ## xtrec
 
-Implements the recursively detrended panel unit root tests of @Westerlund2015. The basic t-REC test assumes iid errors; the robust t-RREC test accounts for serial correlation, cross-sectional dependence, and heteroskedasticity via defactoring and BIC-selected lag augmentation. Both tests have standard normal null distributions.
+Recursively detrended panel unit root tests of @Westerlund2015. The basic t-REC assumes iid errors; the robust t-RREC accounts for serial correlation, cross-sectional dependence, and heteroskedasticity.
 
 ```r
 library(xtrec)
-result <- xtrec(y ~ 1, data = panel_data,
-                id = "country", time = "year", robust = TRUE)
+result <- xtrec(data = panel_data, var = "gdp",
+                panel_id = "country", time_id = "year",
+                robust = TRUE)
 summary(result)
 ```
 
 ## xtfifevd
 
-Implements the Fixed Effects Vector Decomposition (FEVD) estimator of @Plumper2007 and the Fixed Effects Filtered (FEF) and FEF-IV estimators of @PesaranZhou2016. Provides consistent standard errors for time-invariant regressors using the corrected variance estimator, with comparison of corrected versus raw standard errors.
+FEVD [@Plumper2007], FEF, and FEF-IV [@PesaranZhou2016] estimators for time-invariant regressors in panel fixed effects models.
 
 ```r
 library(xtfifevd)
 result <- xtfifevd(y ~ x1 + x2 | z1 + z2, data = panel_data,
                    id = "country", time = "year",
-                   method = "fef", time_invariant = c("z1", "z2"))
+                   method = "fef")
 summary(result)
 ```
 
 ## xtqsh
 
-Implements the quantile regression slope homogeneity test of @Galvao2017. Provides Ŝ (chi-squared) and D̂ (standard normal) test statistics for both joint and marginal slope homogeneity. Returns minimum distance QR estimates with bandwidth selection following Bofinger (1975) or Hall and Sheather (1988).
+Quantile regression slope homogeneity test of @Galvao2017. Provides Ŝ (chi-squared) and D̂ (standard normal) statistics for joint and marginal homogeneity.
 
 ```r
 library(xtqsh)
 result <- xtqsh(y ~ x1 + x2, data = panel_data,
                 id = "country", time = "year",
-                taus = c(0.25, 0.5, 0.75))
+                tau = c(0.25, 0.5, 0.75))
 summary(result)
 ```
 
 # Acknowledgements
 
-The author acknowledges the econometric researchers whose original methodologies and software implementations (in Stata, GAUSS, and MATLAB) provided the foundation for these R packages.
+The author acknowledges the econometric researchers whose original Stata, GAUSS, and MATLAB implementations provided the foundation for these R packages.
 
 # References
